@@ -17,6 +17,7 @@ from neo4j_graphrag.experimental.components.text_splitters.base import TextSplit
 
 from neo4j_graphrag.generation.prompts import RagTemplate
 from app.utils.prompts import RETRIEVER_PROMPT
+from neo4j_graphrag.experimental.pipeline.pipeline import PipelineResult
 
 
 @singleton
@@ -81,7 +82,7 @@ class Neo4jDatabase:
         file_path: str,
         document_metada: dict = None,
         text_splitter: TextSplitter = None,
-    ) -> Any | dict:
+    ) -> PipelineResult:
 
         kg_builder = SimpleKGPipeline(
             llm=llm,
@@ -94,7 +95,7 @@ class Neo4jDatabase:
         result = asyncio.run(
             kg_builder.run_async(file_path=file_path, document_metadata=document_metada)
         )
-        return result.result
+        return result
 
     def delete_document_with_metadata(self, metadata: dict) -> EagerResult:
         keys = "AND ".join([f"d.{k}= ${k}" for k in metadata.keys()])

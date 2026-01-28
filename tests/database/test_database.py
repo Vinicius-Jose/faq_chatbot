@@ -11,11 +11,9 @@ from os import getenv
 import pytest
 from typing import Generator
 from time import sleep
-from tests import PATH_PDF_SAMPLE
+from tests import PATH_PDF_SAMPLE, DOCUMENT_METADATA
 
 load_dotenv("./.env")
-
-DOCUMENT_METADATA = {"subject": "Test"}
 
 
 @pytest.fixture(scope="module")
