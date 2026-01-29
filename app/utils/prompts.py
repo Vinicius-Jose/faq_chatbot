@@ -6,6 +6,7 @@ Rules:
    - Single top-level object
    - No markdown, no extra text
    - No comments or trailing commas
+   - The json must have a key called "answer" with your complete answer in text
 4. If a Cypher query cannot be generated, return:
    {"error": "<human-readable explanation>"}
 

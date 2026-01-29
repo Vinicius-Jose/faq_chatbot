@@ -10,7 +10,7 @@ from langchain_huggingface.embeddings import HuggingFaceEndpointEmbeddings
 from neo4j_graphrag.llm import LLMInterface
 from neo4j_graphrag.embeddings import Embedder
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain.agents import create_agent
 from app.utils.prompts import DEFAULT_SYSTEM_INSTRUCTIONS
 
@@ -44,7 +44,16 @@ class LLM(LLMInterface):
             HumanMessage(content=input),
         ]
         if message_history:
-            messages = message_history + messages
+            formatted_messages = []
+            for message in message_history:
+                if message["role"] == "system":
+                    aux_msg = SystemMessage(content=message["content"])
+                elif message["role"] == "user":
+                    aux_msg = HumanMessage(content=message["content"])
+                else:
+                    aux_msg = AIMessage(content=message["content"])
+                formatted_messages.append(aux_msg)
+            messages = formatted_messages + messages
         response = self.model.invoke(messages)
         return LLMResponse(content=response.content)
 
@@ -59,7 +68,7 @@ class LLM(LLMInterface):
             HumanMessage(content=input),
         ]
         response = self.model.ainvoke(messages)
-        return response
+        return LLMResponse(content=response.content)
 
     def invoke_with_tools(
         self,

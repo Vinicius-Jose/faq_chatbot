@@ -1,9 +1,6 @@
 from fastapi.testclient import TestClient
-from app.main import app
+from tests.controller import client
 from tests import PATH_PDF_SAMPLE, DOCUMENT_METADATA
-
-
-client = TestClient(app)
 
 
 def test_post_file() -> None:

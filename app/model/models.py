@@ -10,3 +10,13 @@ class User(BaseModel):
     username: str = Field()
     full_name: str = Field()
     password: str = Field()
+
+
+class Message(BaseModel):
+    user_id: str = Field()
+    text: str = Field()
+
+
+class LLMResponseEndpoint(BaseModel):
+    answer: str = Field()
+    session_id: str = Field()

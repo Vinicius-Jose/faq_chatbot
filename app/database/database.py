@@ -18,6 +18,7 @@ from neo4j_graphrag.experimental.components.text_splitters.base import TextSplit
 from neo4j_graphrag.generation.prompts import RagTemplate
 from app.utils.prompts import RETRIEVER_PROMPT
 from neo4j_graphrag.experimental.pipeline.pipeline import PipelineResult
+from neo4j_graphrag.message_history import Neo4jMessageHistory
 
 
 @singleton
@@ -65,6 +66,17 @@ class Neo4jDatabase:
         """
         records, _, _ = self.__driver.execute_query(query, data)
         return records
+
+    def get_basemodel(self, model: BaseModel) -> BaseModel:
+        label, _, merge_keys, _, merge_data = self.__extract_keys_basemodel(model)
+
+        query = f"""
+        MATCH (n:{label} {{{merge_keys}}})
+        RETURN n"""
+        records, _, _ = self.__driver.execute_query(query, merge_data)
+        model_cls = model.__class__
+        model_found = model_cls(**records[0][0])
+        return model_found
 
     def delete_basemodel(self, model: BaseModel) -> EagerResult:
         label, _, merge_keys, _, merge_data = self.__extract_keys_basemodel(model)
@@ -129,3 +141,38 @@ class Neo4jDatabase:
             custom_prompt=RETRIEVER_PROMPT,
         )
         return self.retriever
+
+    def get_message_history(
+        self, session_id: str, window: str = 3
+    ) -> Neo4jMessageHistory:
+        history = Neo4jMessageHistory(
+            session_id=session_id,
+            driver=self.__driver,
+            database=self.database,
+            window=window,
+        )
+        return history
+
+    def link_basemodel_to_session(
+        self, model: BaseModel, session_id: str
+    ) -> EagerResult:
+        label, _, merge_keys, _, merge_data = self.__extract_keys_basemodel(model)
+
+        query = f"""
+        MATCH (n:{label} {{{merge_keys}}})
+        MATCH (s:Session {{id: $session_id}})
+        MERGE (n)-[r:HAS_CONVERSATION]->(s)
+        RETURN n,r,s
+        """
+        merge_data["session_id"] = session_id
+        records, _, _ = self.__driver.execute_query(query, merge_data)
+        return records
+
+    def get_sessions_from_user(self, user: BaseModel) -> EagerResult:
+        label, _, merge_keys, _, merge_data = self.__extract_keys_basemodel(user)
+        query = f"""
+            MATCH (n:{label} {{{merge_keys}}})-[]->(s:Session)
+            RETURN s.id
+            """
+        records, _, _ = self.__driver.execute_query(query, merge_data)
+        return records
