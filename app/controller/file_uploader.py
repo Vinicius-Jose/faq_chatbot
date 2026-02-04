@@ -26,9 +26,9 @@ def post_file(
             status.HTTP_400_BAD_REQUEST,
             detail="Invalid document type, only PDF is supported",
         )
-    db = Neo4jDatabase()
-    llm = LLM(model_name=f"groq:{getenv('GROQ_MODEL')}")
     embedder = EmbbeddingHuggingFace()
+    db = Neo4jDatabase(embedder)
+    llm = LLM(model_name=f"groq:{getenv('GROQ_MODEL')}")
     splitter = TokenTextSplitter(chunk_size=250, chunk_overlap=10)
     adapter_splitter = LangChainTextSplitterAdapter(splitter)
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
@@ -36,7 +36,6 @@ def post_file(
         tmp.write(pdf_bytes)
         result = db.create_graph_from_pdf(
             llm=llm,
-            embedder=embedder,
             file_path=tmp.name,
             document_metada={"subject": document_subject},
             text_splitter=adapter_splitter,
@@ -46,6 +45,7 @@ def post_file(
 
 @router.delete("/{document_subject}")
 def delete_file_with_subject(document_subject: str) -> list[dict]:
-    db = Neo4jDatabase()
+    embedder = EmbbeddingHuggingFace()
+    db = Neo4jDatabase(embedder)
     result = db.delete_document_with_metadata(metadata={"subject": document_subject})
     return result

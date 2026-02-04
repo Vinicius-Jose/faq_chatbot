@@ -10,20 +10,20 @@ from neo4j_graphrag.experimental.pipeline.kg_builder import SimpleKGPipeline
 from app.utils.tools import singleton
 from pydantic import BaseModel
 import asyncio
-from neo4j_graphrag.retrievers import Text2CypherRetriever
+from neo4j_graphrag.retrievers.vector import VectorRetriever
 from neo4j_graphrag.generation import GraphRAG
 from neo4j_graphrag.generation.types import RagResultModel
 from neo4j_graphrag.experimental.components.text_splitters.base import TextSplitter
 
 from neo4j_graphrag.generation.prompts import RagTemplate
-from app.utils.prompts import RETRIEVER_PROMPT
+
 from neo4j_graphrag.experimental.pipeline.pipeline import PipelineResult
 from neo4j_graphrag.message_history import Neo4jMessageHistory
 
 
 @singleton
 class Neo4jDatabase:
-    def __init__(self, llm_retriever: LLMInterface = None) -> None:
+    def __init__(self, embedder: Embedder) -> None:
         url: str = getenv("NEO4J_URI")
         username: str = getenv("NEO4J_USERNAME")
         password: str = getenv("NEO4J_PASSWORD")
@@ -32,8 +32,9 @@ class Neo4jDatabase:
             url=url, username=username, password=password, database=self.database
         )
         self.__driver = self.__graph._driver
-        if llm_retriever:
-            self.set_retriever(llm_retriever)
+        self.embedder = embedder
+        self.retriever = None
+        self.vector_dimensions = int(getenv("VECTOR_DIMENSIONS"))
 
     def get_graph(self) -> Neo4jGraph:
         return self.__graph
@@ -90,7 +91,6 @@ class Neo4jDatabase:
     def create_graph_from_pdf(
         self,
         llm: LLMInterface,
-        embedder: Embedder,
         file_path: str,
         document_metada: dict = None,
         text_splitter: TextSplitter = None,
@@ -100,14 +100,28 @@ class Neo4jDatabase:
             llm=llm,
             driver=self.__driver,
             neo4j_database=self.database,
-            embedder=embedder,
+            embedder=self.embedder,
             from_pdf=True,
             text_splitter=text_splitter,
         )
         result = asyncio.run(
             kg_builder.run_async(file_path=file_path, document_metadata=document_metada)
         )
+        self.__create_vector_index()
         return result
+
+    def __create_vector_index(self) -> None:
+        query = """
+        CREATE VECTOR INDEX chunkEmbeddings IF NOT EXISTS 
+        FOR (c:Chunk)
+        ON c.embedding
+        OPTIONS {
+        indexConfig: {
+            `vector.dimensions`: $dimensions,
+            `vector.similarity_function`: 'cosine'
+        }
+        }"""
+        self.__driver.execute_query(query, {"dimensions": self.vector_dimensions})
 
     def delete_document_with_metadata(self, metadata: dict) -> EagerResult:
         keys = "AND ".join([f"d.{k}= ${k}" for k in metadata.keys()])
@@ -126,21 +140,22 @@ class Neo4jDatabase:
         message_history: list = [],
         rag_template: RagTemplate = None,
     ) -> RagResultModel:
+        if not self.retriever:
+            self.set_retriever(self.embedder)
         rag = GraphRAG(retriever=self.retriever, llm=llm, prompt_template=rag_template)
         response = rag.search(
             query_text=query_text, return_context=True, message_history=message_history
         )
         return response
 
-    def set_retriever(self, llm: LLMInterface):
-        self.retriever = Text2CypherRetriever(
+    def set_retriever(self, embedder: Embedder):
+        self.retriever = VectorRetriever(
             driver=self.__driver,
+            embedder=embedder,
+            index_name="chunkEmbeddings",
             neo4j_database=self.database,
-            llm=llm,
-            neo4j_schema=self.__graph.get_schema,
-            custom_prompt=RETRIEVER_PROMPT,
+            return_properties=["text"],
         )
-        return self.retriever
 
     def get_message_history(
         self, session_id: str, window: str = 3

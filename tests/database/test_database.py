@@ -22,9 +22,10 @@ def setup() -> Tuple[
     TokenTextSplitter,
     LangChainTextSplitterAdapter,
 ]:
-    db = Neo4jDatabase()
+
     chat_model = LLM(model_name=f"groq:{getenv('GROQ_MODEL')}")
     embedder = EmbbeddingHuggingFace()
+    db = Neo4jDatabase(embedder)
     splitter = TokenTextSplitter(chunk_size=250, chunk_overlap=10)
     adapter_splitter = LangChainTextSplitterAdapter(splitter)
     return db, chat_model, embedder, adapter_splitter
@@ -35,7 +36,6 @@ def setup_pdf_sample() -> Generator[dict, None, None]:
     db, chat_model, embedder, adapter_splitter = setup()
     result = db.create_graph_from_pdf(
         llm=chat_model,
-        embedder=embedder,
         file_path=PATH_PDF_SAMPLE,
         document_metada=DOCUMENT_METADATA,
         text_splitter=adapter_splitter,
@@ -51,7 +51,7 @@ def setup_pdf_sample() -> Generator[dict, None, None]:
 
 
 def test_database_neo4j_connection() -> None:
-    db = Neo4jDatabase()
+    db, _, _, _ = setup()
     assert db.get_graph()._check_driver_state() is None
 
 
@@ -84,29 +84,6 @@ def test_get_basemodel_user() -> None:
     assert user_bd.password == user.password
     records = db.delete_basemodel(user)
     assert len(records) == 0
-
-
-def test_create_graph_from_pdf(setup_pdf_sample: dict) -> None:
-    result = setup_pdf_sample.get("result")
-    assert result is not None
-
-
-def test_rag_response(setup_pdf_sample: dict) -> None:
-    sample_data = setup_pdf_sample
-    db: Neo4jDatabase = sample_data.get("db")
-    chat_model: LLM = sample_data.get("chat_model")
-    chat_model_retriever = LLM(
-        model_name=f"groq:{getenv('GROQ_MODEL')}",
-        model_params={"model_kwargs": {"response_format": {"type": "text"}}},
-    )
-    db.set_retriever(chat_model_retriever)
-    rag_template = RagTemplate(system_instructions=DEFAULT_SYSTEM_INSTRUCTIONS)
-    query = """How does providing a clear and precise prompt help an LLM understand the task and generate accurate, relevant responses?"""
-    sleep(120)  # Since free tier has a low limit of token usage per minute
-    response = db.rag_response(
-        llm=chat_model, query_text=query, rag_template=rag_template
-    )
-    assert response.answer is not None
 
 
 def test_get_message_history() -> None:
@@ -143,4 +120,61 @@ def test_link_basemodel_to_session() -> None:
     db.link_basemodel_to_session(user, session_id)
     result = db.get_sessions_from_user(user)
     assert result[0][0] == session_id
+    history.clear(True)
+    db.delete_basemodel(user)
+
+
+def test_create_graph_from_pdf(setup_pdf_sample: dict) -> None:
+    result = setup_pdf_sample.get("result")
+    assert result is not None
+
+
+def test_retriever(setup_pdf_sample: dict) -> None:
+    db: Neo4jDatabase = setup_pdf_sample.get("db")
+    retriever = db.retriever
+    records = retriever.get_search_results(
+        query_text="What is Large Language Models (LLM) ?"
+    )
+    assert len(records.records) > 1
+
+
+def test_rag_response(setup_pdf_sample: dict) -> None:
+    db: Neo4jDatabase = setup_pdf_sample.get("db")
+    chat_model: LLM = setup_pdf_sample.get("chat_model")
+    rag_template = RagTemplate(system_instructions=DEFAULT_SYSTEM_INSTRUCTIONS)
+    query = """How does providing a clear and precise prompt help an LLM understand the task and generate accurate, relevant responses?"""
+    sleep(120)  # Since free tier has a low limit of token usage per minute
+    response = db.rag_response(
+        llm=chat_model, query_text=query, rag_template=rag_template
+    )
+    assert response.answer
+
+
+def test_rag_response_with_message_history(setup_pdf_sample: dict) -> None:
+    db: Neo4jDatabase = setup_pdf_sample.get("db")
+    chat_model: LLM = setup_pdf_sample.get("chat_model")
+    rag_template = RagTemplate(system_instructions=DEFAULT_SYSTEM_INSTRUCTIONS)
+    query = "How does providing a clear and precise prompt help an LLM understand the task and generate accurate, relevant responses?"
+    message = LLMMessage(role="user", content=query)
+    history = db.get_message_history(session_id=SESSION_ID)
+    history.add_message(message)
+    sleep(120)  # Since free tier has a low limit of token usage per minute
+    response_question_1 = db.rag_response(
+        llm=chat_model, query_text=query, rag_template=rag_template
+    )
+    message = LLMMessage(role="assistant", content=response_question_1.answer)
+    history.add_message(message)
+    query = "Explain again with some notes and other words"
+    message = LLMMessage(role="user", content=query)
+    history.add_message(message)
+    response_question_2 = db.rag_response(
+        llm=chat_model,
+        query_text=query,
+        rag_template=rag_template,
+        message_history=history,
+    )
+    message = LLMMessage(role="assistant", content=response_question_2.answer)
+    history.add_message(message)
+    assert response_question_2.answer
+    assert response_question_2.answer != response_question_1.answer
     history.clear(True)

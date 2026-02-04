@@ -14,9 +14,10 @@ class User(BaseModel):
 
 class Message(BaseModel):
     user_id: str = Field()
+    session_id: str | None = Field(default=None)
     text: str = Field()
 
 
 class LLMResponseEndpoint(BaseModel):
     answer: str = Field()
-    session_id: str = Field()
+    session_id: str | None = Field(default=None)

@@ -12,5 +12,4 @@ router = APIRouter(prefix="/llm", tags=["llm"])
 def post(message: Message) -> LLMResponseEndpoint:
     llm = LLM(model_name=f"groq:{getenv('GROQ_MODEL')}")
     llm_response = llm.invoke(message.text)
-    llm_response_json = json.loads(llm_response.content)
-    return LLMResponseEndpoint(answer=llm_response_json["answer"])
+    return LLMResponseEndpoint(answer=llm_response.content)

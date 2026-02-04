@@ -25,49 +25,56 @@ class LLM(LLMInterface):
         **kwargs: Any,
     ):
         super().__init__(model_name, model_params, rate_limit_handler, **kwargs)
+        self.model_kwargs: dict = model_params.get(
+            "model_kwargs", {"response_format": {"type": "json_object"}}
+        )
         self.model = init_chat_model(
             self.model_name,
             temperature=model_params.get("temperature", 0.7),
-            model_kwargs=model_params.get(
-                "model_kwargs", {"response_format": {"type": "json_object"}}
-            ),
+            model_kwargs=self.model_kwargs,
         )
+        self.types_messages: dict = {
+            "system": SystemMessage,
+            "user": HumanMessage,
+            "assistant": AIMessage,
+        }
 
     def invoke(
         self,
         input: str,
         message_history: List[LLMMessage] | MessageHistory | None = [],
-        system_instruction: str | None = DEFAULT_SYSTEM_INSTRUCTIONS,
+        system_instruction: str | None = "",
     ) -> LLMResponse:
         messages = [
             SystemMessage(content=system_instruction),
             HumanMessage(content=input),
         ]
-        if message_history:
-            formatted_messages = []
-            for message in message_history:
-                if message["role"] == "system":
-                    aux_msg = SystemMessage(content=message["content"])
-                elif message["role"] == "user":
-                    aux_msg = HumanMessage(content=message["content"])
-                else:
-                    aux_msg = AIMessage(content=message["content"])
-                formatted_messages.append(aux_msg)
-            messages = formatted_messages + messages
+        self.validate_model_kwargs(system_instruction, input)
+        messages = self.format_messages(message_history, messages)
         response = self.model.invoke(messages)
         return LLMResponse(content=response.content)
 
-    def ainvoke(
+    def validate_model_kwargs(self, system_instruction: str, input: str):
+        is_json_format_requested = (
+            "json" in system_instruction.lower() or "json" in input.lower()
+        )
+        if is_json_format_requested:
+            self.model.model_kwargs = {"response_format": {"type": "json_object"}}
+        else:
+            self.model.model_kwargs = {"response_format": {"type": "text"}}
+
+    async def ainvoke(
         self,
         input: str,
         message_history: List[LLMMessage] | MessageHistory | None = [],
-        system_instruction: str | None = DEFAULT_SYSTEM_INSTRUCTIONS,
+        system_instruction: str | None = "",
     ) -> Coroutine[Any, Any, LLMResponse]:
         messages = message_history + [
             SystemMessage(content=system_instruction),
             HumanMessage(content=input),
         ]
-        response = self.model.ainvoke(messages)
+        messages = self.format_messages(message_history, messages)
+        response = await self.model.ainvoke(messages)
         return LLMResponse(content=response.content)
 
     def invoke_with_tools(
@@ -103,6 +110,17 @@ class LLM(LLMInterface):
             {"messages": [{"role": "user", "content": input}]},
         )
         return result
+
+    def format_messages(self, message_history, messages):
+        if message_history:
+            formatted_messages = []
+            for message in message_history:
+                aux_msg = self.types_messages[message["role"]](
+                    content=message["content"]
+                )
+                formatted_messages.append(aux_msg)
+            messages = formatted_messages + messages
+        return messages
 
 
 class EmbbeddingHuggingFace(Embedder):
