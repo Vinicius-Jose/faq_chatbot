@@ -1,4 +1,3 @@
-from fastapi.testclient import TestClient
 from tests.controller import client
 from tests import PATH_PDF_SAMPLE, DOCUMENT_METADATA
 

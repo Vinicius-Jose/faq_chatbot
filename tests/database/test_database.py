@@ -1,6 +1,7 @@
 from app.database.database import Neo4jDatabase
 from app.model.models import User
-from app.services.llm import LLM, EmbbeddingHuggingFace, DEFAULT_SYSTEM_INSTRUCTIONS
+from app.services.llm import LLM, EmbbeddingHuggingFace
+from app.utils.prompts import DEFAULT_SYSTEM_INSTRUCTIONS
 from langchain_text_splitters import TokenTextSplitter
 from neo4j_graphrag.types import LLMMessage
 from neo4j_graphrag.experimental.components.text_splitters.langchain import (
@@ -11,7 +12,7 @@ from os import getenv
 import pytest
 from typing import Generator, Tuple
 from time import sleep
-from tests import PATH_PDF_SAMPLE, DOCUMENT_METADATA, SESSION_ID
+from tests import PATH_PDF_SAMPLE, DOCUMENT_METADATA, SESSION_ID, USER
 import uuid
 
 
@@ -57,32 +58,21 @@ def test_database_neo4j_connection() -> None:
 
 def test_insert_basemodel_user() -> None:
     db, _, _, _ = setup()
-    user = User(
-        email="teste@email.com",
-        username="Teste",
-        password="123",
-        full_name="Teste Testado",
-    )
-    records = db.save_basemodel(user)
+
+    records = db.save_basemodel(USER)
     assert len(records) == 1
-    records = db.delete_basemodel(user)
+    records = db.delete_basemodel(USER)
     assert len(records) == 0
 
 
 def test_get_basemodel_user() -> None:
     db, _, _, _ = setup()
-    user = User(
-        email="teste@email.com",
-        username="Teste",
-        password="123",
-        full_name="Teste Testado",
-    )
-    db.save_basemodel(user)
-    user_bd = db.get_basemodel(user)
+    db.save_basemodel(USER)
+    user_bd = db.get_basemodel(USER)
     assert isinstance(user_bd, User)
-    assert user_bd.email == user.email
-    assert user_bd.password == user.password
-    records = db.delete_basemodel(user)
+    assert user_bd.email == USER.email
+    assert user_bd.password == USER.password
+    records = db.delete_basemodel(USER)
     assert len(records) == 0
 
 
@@ -107,21 +97,15 @@ def test_save_message_history() -> None:
 
 def test_link_basemodel_to_session() -> None:
     db, _, _, _ = setup()
-    user = User(
-        email="teste@email.com",
-        username="Teste",
-        password="123",
-        full_name="Teste Testado",
-    )
     db = Neo4jDatabase()
-    db.save_basemodel(user)
+    db.save_basemodel(USER)
     session_id = str(uuid.uuid4())
     history = db.get_message_history(session_id)
-    db.link_basemodel_to_session(user, session_id)
-    result = db.get_sessions_from_user(user)
+    db.link_basemodel_to_session(USER, session_id)
+    result = db.get_sessions_from_user(USER)
     assert result[0][0] == session_id
     history.clear(True)
-    db.delete_basemodel(user)
+    db.delete_basemodel(USER)
 
 
 def test_create_graph_from_pdf(setup_pdf_sample: dict) -> None:
