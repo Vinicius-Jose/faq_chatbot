@@ -1,8 +1,8 @@
 from typing import Annotated
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 
 
-Neo4jKey = Annotated[str, Field(json_schema_extra={"neo4j_key": True})]
+Neo4jKey = Annotated[EmailStr, Field(json_schema_extra={"neo4j_key": True})]
 
 
 class User(BaseModel):
@@ -13,7 +13,6 @@ class User(BaseModel):
 
 
 class Message(BaseModel):
-    user_email: str = Field()
     session_id: str | None = Field(default=None)
     text: str = Field()
 

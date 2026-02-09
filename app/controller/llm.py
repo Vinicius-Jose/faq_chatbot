@@ -1,53 +1,84 @@
-from fastapi import APIRouter, HTTPException
+from typing import Annotated, List
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi import status
 from uuid import uuid4
 from os import getenv
 
+from app.controller.user import get_current_active_user
 from app.database.database import Neo4jDatabase
 from app.model.models import LLMResponseEndpoint, Sessions, User
 from app.model.models import Message
-from app.services.llm import LLM
+from app.services.llm import LLM, EmbbeddingHuggingFace
+from neo4j_graphrag.types import LLMMessage
 
 
 router = APIRouter(prefix="/llm", tags=["llm"])
 
 
 @router.post("/")
-def post(message: Message) -> LLMResponseEndpoint:
-    db = Neo4jDatabase()
-    try:
-        user = db.get_basemodel(User(email=message.user_email))
-    except (IndexError, TypeError):
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-    session_id = message.session_id if message.session_id else str(uuid4())
-    history = db.get_message_history(session_id=session_id)
-    db.link_basemodel_to_session(user, session_id)
+def post(
+    message: Message,
+    user: Annotated[User, Depends(get_current_active_user)],
+) -> LLMResponseEndpoint:
+    embedder = EmbbeddingHuggingFace()
+    db = Neo4jDatabase(embedder)
+
+    if not check_session_user(message.session_id, user, db=db):
+        message.session_id = str(uuid4())
+
+    history = db.get_message_history(session_id=message.session_id)
+    db.link_basemodel_to_session(user, message.session_id)
     llm = LLM(model_name=f"groq:{getenv('GROQ_MODEL')}")
-
     llm_response = llm.invoke(message.text, message_history=history)
-    return LLMResponseEndpoint(answer=llm_response.content, session_id=session_id)
+    message_llm = LLMMessage(role="user", content=message.text)
+    response_llm = LLMMessage(role="assistant", content=llm_response.content)
+    history.add_messages([message_llm, response_llm])
+    return LLMResponseEndpoint(
+        answer=llm_response.content, session_id=message.session_id
+    )
 
 
-@router.get("/sessions")
-def get_sessions(email: str) -> Sessions:
-    db = Neo4jDatabase()
-    sessions = db.get_sessions_from_user(User(email=email))
-    return Sessions(sessions=sessions[0])
+@router.get("/sessions", tags=["session"])
+def get_sessions(
+    user: Annotated[User, Depends(get_current_active_user)],
+) -> Sessions:
+    embedder = EmbbeddingHuggingFace()
+    db = Neo4jDatabase(embedder)
+    sessions = db.get_sessions_from_user(user)
+    if sessions:
+        sessions = sessions[0]
+    return Sessions(sessions=sessions)
 
 
-@router.delete("/sessions")
-def delete_session(email: str, session_id: str) -> Sessions:
-    db = Neo4jDatabase()
-    sessions = db.get_sessions_from_user(User(email=email))
-    for session in sessions[0]:
-        if session == session_id:
-            history = db.get_message_history(session_id=session_id)
-            history.clear(True)
-            return Sessions(sessions=[session_id])
+@router.get("/sessions/{session_id}", tags=["session"])
+def get_message_from_session(
+    user: Annotated[User, Depends(get_current_active_user)], session_id: str
+) -> List[LLMMessage]:
+    embedder = EmbbeddingHuggingFace()
+    db = Neo4jDatabase(embedder)
+    history = db.get_message_history(session_id)
+    return history.messages
+
+
+@router.delete("/sessions", tags=["session"])
+def delete_session(
+    session_id: str,
+    user: Annotated[User, Depends(get_current_active_user)],
+) -> Sessions:
+    embedder = EmbbeddingHuggingFace()
+    db = Neo4jDatabase(embedder)
+    if check_session_user(session_id, user, db=db):
+        history = db.get_message_history(session_id=session_id)
+        history.clear(True)
+        return Sessions(sessions=[session_id])
     raise HTTPException(
         status.HTTP_404_NOT_FOUND,
         detail="Session not found",
     )
+
+
+def check_session_user(session_id: str, user: User, db: Neo4jDatabase) -> bool:
+    sessions = db.get_sessions_from_user(user)
+    if sessions:
+        return any(1 for session in sessions[0] if session == session_id)
+    return False

@@ -13,6 +13,7 @@ from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from langchain.agents import create_agent
 from app.utils.prompts import DEFAULT_SYSTEM_INSTRUCTIONS
+from neo4j_graphrag.message_history import Neo4jMessageHistory
 
 
 class LLM(LLMInterface):
@@ -111,10 +112,10 @@ class LLM(LLMInterface):
         )
         return result
 
-    def format_messages(self, message_history, messages):
-        if message_history:
+    def format_messages(self, message_history: Neo4jMessageHistory, messages: list):
+        if message_history.messages:
             formatted_messages = []
-            for message in message_history:
+            for message in message_history.messages:
                 aux_msg = self.types_messages[message["role"]](
                     content=message["content"]
                 )
