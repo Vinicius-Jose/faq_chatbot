@@ -10,7 +10,7 @@ from neo4j_graphrag.experimental.pipeline.kg_builder import SimpleKGPipeline
 from app.utils.tools import singleton
 from pydantic import BaseModel
 import asyncio
-from neo4j_graphrag.retrievers.vector import VectorRetriever
+from neo4j_graphrag.retrievers.vector import VectorCypherRetriever
 from neo4j_graphrag.generation import GraphRAG
 from neo4j_graphrag.generation.types import RagResultModel
 from neo4j_graphrag.experimental.components.text_splitters.base import TextSplitter
@@ -149,12 +149,18 @@ class Neo4jDatabase:
         return response
 
     def set_retriever(self, embedder: Embedder):
-        self.retriever = VectorRetriever(
+        self.retriever = VectorCypherRetriever(
             driver=self.__driver,
             embedder=embedder,
             index_name="chunkEmbeddings",
             neo4j_database=self.database,
-            return_properties=["text"],
+            retrieval_query="""
+                MATCH (chunk)-[]-(doc:Document)
+                RETURN chunk.text AS text,
+                    doc.subject AS subject,
+                    doc.file_name AS tittle,
+                    score
+            """,
         )
 
     def get_message_history(

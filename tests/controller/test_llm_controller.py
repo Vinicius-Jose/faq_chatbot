@@ -1,5 +1,6 @@
 from typing import Tuple
 from tests.controller import client, delete_user, setup_user, insert_user, authenticate
+from tests.database.test_database import setup_pdf_sample
 from tests import USER
 
 
@@ -95,4 +96,16 @@ def test_get_messages_from_session(setup_user: Tuple[dict, dict]) -> None:
     client.delete(
         "/llm/sessions",
         params={"session_id": session_id},
+    )
+
+
+def test_post_llm_rag(setup_user: Tuple[dict, dict], setup_pdf_sample: dict) -> None:
+    message = {"text": "What is Large Language Models (LLM)?"}
+    response = client.post("/llm/rag", json=message)
+    assert response.status_code == 200
+    response_json = response.json()
+    assert response_json["answer"]
+    client.delete(
+        "/llm/sessions",
+        params={"session_id": response_json["session_id"]},
     )

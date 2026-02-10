@@ -21,7 +21,9 @@ router = APIRouter(prefix="/files", tags=["files"])
 
 @router.post("/")
 def post_file(
-    file: UploadFile = File(...), document_subject: str = Form(...)
+    file: UploadFile = File(...),
+    document_subject: str = Form(...),
+    file_name: str = Form(),
 ) -> PipelineResult:
     if file.content_type != "application/pdf" or Path(file.filename).suffix != ".pdf":
         raise HTTPException(
@@ -39,7 +41,7 @@ def post_file(
         result = db.create_graph_from_pdf(
             llm=llm,
             file_path=tmp.name,
-            document_metada={"subject": document_subject},
+            document_metada={"subject": document_subject, "file_name": file_name},
             text_splitter=adapter_splitter,
         )
     return result

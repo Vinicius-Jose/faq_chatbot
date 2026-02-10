@@ -113,9 +113,14 @@ class LLM(LLMInterface):
         return result
 
     def format_messages(self, message_history: Neo4jMessageHistory, messages: list):
-        if message_history.messages:
+        message_history = (
+            message_history.messages
+            if hasattr(messages, "messages")
+            else message_history
+        )
+        if message_history:
             formatted_messages = []
-            for message in message_history.messages:
+            for message in message_history:
                 aux_msg = self.types_messages[message["role"]](
                     content=message["content"]
                 )

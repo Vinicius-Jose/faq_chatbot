@@ -10,7 +10,10 @@ def test_post_file(setup_user: Tuple[dict, dict]) -> None:
     files = {"file": (pdf_file.name, pdf_file.read(), "application/pdf")}
     response = client.post(
         "/files/",
-        data={"document_subject": DOCUMENT_METADATA.get("subject")},
+        data={
+            "document_subject": DOCUMENT_METADATA.get("subject"),
+            "file_name": DOCUMENT_METADATA.get("file_name"),
+        },
         files=files,
         headers=headers,
     )
@@ -27,7 +30,10 @@ def test_post_file_not_supported(setup_user: Tuple[dict, dict]) -> None:
     response = client.post(
         "/files/",
         files=files,
-        data={"document_subject": DOCUMENT_METADATA.get("subject")},
+        data={
+            "document_subject": DOCUMENT_METADATA.get("subject"),
+            "file_name": DOCUMENT_METADATA.get("file_name"),
+        },
         headers=headers,
     )
     assert response.status_code == 400
