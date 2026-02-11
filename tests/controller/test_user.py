@@ -8,6 +8,7 @@ from tests import USER
     "email, pwd, status_code",
     [
         (USER.email, USER.password, 200),
+        (USER.email, "wrong", 401),
         ("master_chief@email.com", "halo", 401),
     ],
 )
