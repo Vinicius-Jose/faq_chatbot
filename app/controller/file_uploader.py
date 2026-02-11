@@ -23,7 +23,7 @@ router = APIRouter(prefix="/files", tags=["files"])
 def post_file(
     file: UploadFile = File(...),
     document_subject: str = Form(...),
-    file_name: str = Form(),
+    file_name: str = Form(...),
 ) -> PipelineResult:
     if file.content_type != "application/pdf" or Path(file.filename).suffix != ".pdf":
         raise HTTPException(

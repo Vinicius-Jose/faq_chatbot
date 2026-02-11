@@ -13,9 +13,10 @@ def authenticate(email: str, pwd: str) -> dict:
     payload = f"grant_type=password&username={email}&password={pwd}"
     response = client.post("/user/token", data=payload, headers=headers)
     response = response.json()
-    headers = {"Authorization": f"{response['token_type']} {response['access_token']}"}
-    client.headers.update(headers)
-    return headers
+    token = {"Authorization": f"{response['token_type']} {response['access_token']}"}
+    client.headers.clear()
+    client.headers.update(token)
+    return token
 
 
 def insert_user(user: dict):

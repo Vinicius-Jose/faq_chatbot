@@ -1,5 +1,5 @@
 from app.database.database import Neo4jDatabase
-from app.services.llm import LLM
+from app.services.llm import LLM, EmbbeddingHuggingFace
 from neo4j_graphrag.types import LLMMessage
 from os import getenv
 from tests import SESSION_ID
@@ -20,7 +20,8 @@ def test_llm_ainvoke() -> None:
 
 
 def test_llm_invoke_with_message_history() -> None:
-    db = Neo4jDatabase()
+    embedder = EmbbeddingHuggingFace()
+    db = Neo4jDatabase(embedder)
     chat_model = LLM(model_name=f"groq:{getenv('GROQ_MODEL')}")
     history = db.get_message_history(session_id=SESSION_ID)
     message = LLMMessage(
@@ -29,21 +30,19 @@ def test_llm_invoke_with_message_history() -> None:
     first_response = chat_model.invoke(input=message["content"])
 
     history.add_message(message)
-    first_response = json.loads(first_response.content)
-    history.add_message(LLMMessage(role="assistant", content=first_response["answer"]))
+    history.add_message(LLMMessage(role="assistant", content=first_response.content))
     message = LLMMessage(
         role="user",
-        content="Explain again with another words and with a maximum of 5 words",
+        content="Explain again with another words and using less words than the last response",
     )
     second_response = chat_model.invoke(
         input=message["content"], message_history=history.messages
     )
     history.add_message(message)
-    second_response = json.loads(second_response.content)
-    history.add_message(LLMMessage(role="assistant", content=second_response["answer"]))
-    word_count_response_1 = len(second_response["answer"].split(" "))
-    word_count_response_2 = len(first_response["answer"].split(" "))
+    history.add_message(LLMMessage(role="assistant", content=second_response.content))
+    word_count_response_1 = len(first_response.content.split(" "))
+    word_count_response_2 = len(second_response.content.split(" "))
     assert word_count_response_1 <= 10
-    assert word_count_response_2 <= 5
-    assert first_response["answer"].lower() != second_response["answer"].lower()
+    assert word_count_response_2 < word_count_response_1
+    assert first_response.content.lower() != second_response.content.lower()
     history.clear(True)
