@@ -5,7 +5,6 @@ from neo4j_graphrag.message_history import MessageHistory
 from neo4j_graphrag.tool import Tool
 from neo4j_graphrag.types import LLMMessage
 from neo4j_graphrag.utils.rate_limit import RateLimitHandler
-from app.utils.tools import singleton
 from langchain_huggingface.embeddings import HuggingFaceEndpointEmbeddings
 from neo4j_graphrag.llm import LLMInterface
 from neo4j_graphrag.embeddings import Embedder

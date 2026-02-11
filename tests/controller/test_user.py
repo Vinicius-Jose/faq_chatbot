@@ -1,4 +1,3 @@
-from typing import Generator
 import pytest
 from tests.controller import client, setup_user
 from tests import USER

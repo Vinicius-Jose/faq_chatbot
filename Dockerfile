@@ -2,7 +2,7 @@ FROM python:3.10.18-slim-bullseye
 
 WORKDIR /app
 
-COPY ./app /app
+COPY . /app
 
 RUN pip install poetry \
     && poetry install --without dev \
