@@ -115,6 +115,7 @@ def test_create_graph_from_pdf(setup_pdf_sample: dict) -> None:
 
 def test_retriever(setup_pdf_sample: dict) -> None:
     db: Neo4jDatabase = setup_pdf_sample.get("db")
+    db.set_retriever(setup_pdf_sample.get("embedder"))
     retriever = db.retriever
     records = retriever.get_search_results(
         query_text="What is Large Language Models (LLM) ?"
