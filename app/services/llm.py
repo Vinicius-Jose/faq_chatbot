@@ -114,7 +114,7 @@ class LLM(LLMInterface):
     def format_messages(self, message_history: Neo4jMessageHistory, messages: list):
         message_history = (
             message_history.messages
-            if hasattr(messages, "messages")
+            if hasattr(message_history, "messages")
             else message_history
         )
         if message_history:
