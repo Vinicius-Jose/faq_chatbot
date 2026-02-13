@@ -78,7 +78,8 @@ def test_get_basemodel_user() -> None:
 
 def test_get_message_history() -> None:
     db, _, _, _ = setup()
-    history = db.get_message_history(session_id=SESSION_ID)
+    session_id = str(uuid.uuid4())
+    history = db.get_message_history(session_id=session_id)
     assert len(history.messages) == 0
     history.clear(True)
     assert len(history.messages) == 0
@@ -87,7 +88,8 @@ def test_get_message_history() -> None:
 def test_save_message_history() -> None:
     db, _, _, _ = setup()
     message = LLMMessage(role="user", content="Making a Test")
-    history = db.get_message_history(session_id=SESSION_ID)
+    session_id = str(uuid.uuid4())
+    history = db.get_message_history(session_id=session_id)
     history.add_message(message)
     history.add_message(LLMMessage(role="assistant", content="Test Answer"))
     assert len(history.messages) == 2

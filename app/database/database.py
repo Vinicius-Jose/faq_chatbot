@@ -124,7 +124,7 @@ class Neo4jDatabase:
         self.__driver.execute_query(query, {"dimensions": self.vector_dimensions})
 
     def delete_document_with_metadata(self, metadata: dict) -> EagerResult:
-        keys = "AND ".join([f"d.{k}= ${k}" for k in metadata.keys()])
+        keys = " AND ".join([f"d.{k}= ${k}" for k in metadata.keys()])
         query = f"""
             MATCH (d:Document)-[r]-(c)-[re]-(e)
             WHERE {keys}
