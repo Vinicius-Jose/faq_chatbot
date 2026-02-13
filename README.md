@@ -118,7 +118,7 @@ curl -X POST "http://localhost:8000/files/" \
 ```
 
 ### 🛠️ Interactive Documentation
-For a full list of endpoints and interactive testing, visit the Swagger UI:  
+For a full list of endpoints and interactive testing, visit the Swagger UI when running in your local machine:  
 [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ---
